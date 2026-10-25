@@ -20,7 +20,7 @@ POP_SIZE = 500
     
 
 #GENES: Options from which our population would be created.
-GENES = ' Abcdefghijklmnopqrstuvwxyz'
+GENES = ' Abcdefghijklmnopqrstuvwxyza'
 
 #initialization
 
