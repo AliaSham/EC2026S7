@@ -195,13 +195,6 @@ if st.session_state["history"]:
     hist = pd.DataFrame(st.session_state["history"])
     st.dataframe(hist, hide_index=True, use_container_width=True)
 
-    st.write("Average per setting")
-    avg = (hist.groupby(["CO_R", "MUT_R"])["Total Ratings"]
-               .agg(["count", "mean"]).reset_index()
-               .rename(columns={"count": "Runs", "mean": "Average Total Ratings"}))
-    avg["Average Total Ratings"] = avg["Average Total Ratings"].round(2)
-    st.dataframe(avg, hide_index=True, use_container_width=True)
-
     st.download_button(
         "Download history (CSV)", hist.to_csv(index=False).encode("utf-8"),
         file_name="ga_history.csv", mime="text/csv",
