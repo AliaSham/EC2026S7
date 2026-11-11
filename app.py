@@ -10,9 +10,12 @@ GEN = 100   # number of generations
 POP = 50    # population size (number of schedules per generation)
 EL_S = 2    # elitism: the 2 best schedules always survive
 
-# The lecturer confirmed that MUT_R can only be chosen between 0.01 and 0.05.
-# The default of 0.2 in the assignment is outside this range, so the
-# slider starts at 0.05 (the highest value inside the range).
+# Default values from the assignment. They stay in the code as constants.
+# DEFAULT_MUT_R = 0.2 is outside the slider range (0.01 - 0.05, confirmed by
+# the lecturer), so it is not on a slider. It is used only by "Run Default".
+DEFAULT_CO_R = 0.8
+DEFAULT_MUT_R = 0.2
+
 CO_R_MIN, CO_R_MAX, CO_R_DEFAULT = 0.0, 0.95, 0.8
 MUT_R_MIN, MUT_R_MAX, MUT_R_DEFAULT = 0.01, 0.05, 0.05
 
@@ -95,14 +98,49 @@ st.title("TV Program Scheduling using a Genetic Algorithm")
 
 programs, hours, ratings = load_ratings()
 
-seed = st.sidebar.number_input(
+# --- Seed ------------------------------------------------------------
+# Same seed = exactly the same result every time. Change it in the sidebar.
+seed_input = st.sidebar.number_input(
     "Random seed (same seed = repeatable results)", value=42, step=1
 )
 st.sidebar.write(f"GEN = {GEN}, POP = {POP}, EL_S = {EL_S}")
 
-# st.session_state keeps the results so they do not disappear when the page refreshes
+
+# st.session_state keeps results while the page is open (lost on refresh)
 if "results" not in st.session_state:
-    st.session_state["results"] = {}
+    st.session_state["results"] = {}     # latest result of each trial
+if "history" not in st.session_state:
+    st.session_state["history"] = []     # every run
+
+
+def do_run(label, co_r, mut_r, seed):
+    """Run the GA once, add it to the history, and return the result."""
+    best, score, hist = run_ga(programs, len(hours), ratings, co_r, mut_r, seed)
+    st.session_state["history"].append({
+        "Run": len(st.session_state["history"]) + 1,
+        "Label": label,
+        "CO_R": round(co_r, 2),
+        "MUT_R": round(mut_r, 2),
+        "Seed": seed,
+        "Total Ratings": round(score, 2),
+    })
+    return {"co_r": co_r, "mut_r": mut_r, "best": best,
+            "score": score, "history": hist}
+
+
+def show_result(res):
+    st.success(
+        f"CO_R = {res['co_r']}, MUT_R = {res['mut_r']}  |  "
+        f"Total Ratings = {res['score']:.2f}"
+    )
+    table = pd.DataFrame({
+        "Time Slot": [f"{h:02d}:00" for h in hours],
+        "Program": res["best"],
+        "Rating": [ratings[p][i] for i, p in enumerate(res["best"])],
+    })
+    st.table(table)
+    st.line_chart(pd.Series(res["history"], name="Best fitness per generation"))
+
 
 tabs = st.tabs(["Trial 1", "Trial 2", "Trial 3"])
 defaults = [(0.8, 0.05), (0.5, 0.03), (0.95, 0.01)]   # starting values for each trial
@@ -118,34 +156,53 @@ for n, tab in enumerate(tabs, start=1):
         )
 
         if st.button(f"Run Trial {n}", key=f"run{n}"):
-            best, score, history = run_ga(
-                programs, len(hours), ratings, co_r, mut_r, int(seed)
+            st.session_state["results"][n] = do_run(
+                f"Trial {n}", co_r, mut_r, int(seed_input)
             )
-            st.session_state["results"][n] = {
-                "co_r": co_r, "mut_r": mut_r, "best": best,
-                "score": score, "history": history,
-            }
 
         res = st.session_state["results"].get(n)
         if res:
-            st.success(
-                f"CO_R = {res['co_r']}, MUT_R = {res['mut_r']}  |  "
-                f"Total Ratings = {res['score']:.2f}"
-            )
-            table = pd.DataFrame({
-                "Time Slot": [f"{h:02d}:00" for h in hours],
-                "Program": res["best"],
-                "Rating": [ratings[p][i] for i, p in enumerate(res["best"])],
-            })
-            st.table(table)
-            st.line_chart(pd.Series(res["history"], name="Best fitness per generation"))
+            show_result(res)
 
-# Summary table to compare the trials
+# --- Default baseline (values fixed in the code, no slider) ---------
+with st.expander(f"Default baseline (CO_R = {DEFAULT_CO_R}, MUT_R = {DEFAULT_MUT_R})"):
+    if st.button("Run Default", key="run_default"):
+        st.session_state["results"]["Default"] = do_run(
+            "Default", DEFAULT_CO_R, DEFAULT_MUT_R, int(seed_input)
+        )
+    if "Default" in st.session_state["results"]:
+        show_result(st.session_state["results"]["Default"])
+
+# --- Summary table to compare the trials ----------------------------
 if st.session_state["results"]:
     st.subheader("Trial Comparison Summary")
-    summary = pd.DataFrame([
-        {"Trial": n, "CO_R": r["co_r"], "MUT_R": r["mut_r"],
-         "Total Ratings": round(r["score"], 2)}
-        for n, r in sorted(st.session_state["results"].items())
-    ])
-    st.table(summary)
+    rows = []
+    for key in [1, 2, 3, "Default"]:
+        r = st.session_state["results"].get(key)
+        if r:
+            rows.append({
+                "Trial": key, "CO_R": r["co_r"], "MUT_R": r["mut_r"],
+                "Total Ratings": round(r["score"], 2),
+            })
+    st.table(pd.DataFrame(rows))
+
+# --- History of every run + averages --------------------------------
+st.subheader("History (all runs)")
+if st.session_state["history"]:
+    hist = pd.DataFrame(st.session_state["history"])
+    st.dataframe(hist, hide_index=True, use_container_width=True)
+
+    st.write("Average per setting")
+    avg = (hist.groupby(["CO_R", "MUT_R"])["Total Ratings"]
+               .agg(["count", "mean"]).reset_index()
+               .rename(columns={"count": "Runs", "mean": "Average Total Ratings"}))
+    avg["Average Total Ratings"] = avg["Average Total Ratings"].round(2)
+    st.dataframe(avg, hide_index=True, use_container_width=True)
+
+    st.download_button(
+        "Download history (CSV)", hist.to_csv(index=False).encode("utf-8"),
+        file_name="ga_history.csv", mime="text/csv",
+    )
+    st.caption("History is lost when the page is refreshed. Download or copy it first.")
+else:
+    st.info("No runs yet. Press a Run button to start.")
