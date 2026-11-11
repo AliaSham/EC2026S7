@@ -142,10 +142,11 @@ def show_result(res):
     st.line_chart(pd.Series(res["history"], name="Best fitness per generation"))
 
 
-tabs = st.tabs(["Trial 1", "Trial 2", "Trial 3"])
+tab_default, tab1, tab2, tab3 = st.tabs(["Default", "Trial 1", "Trial 2", "Trial 3"])
+trial_tabs = [tab1, tab2, tab3]
 defaults = [(0.8, 0.05), (0.5, 0.03), (0.95, 0.01)]   # starting values for each trial
 
-for n, tab in enumerate(tabs, start=1):
+for n, tab in enumerate(trial_tabs, start=1):
     with tab:
         d_co, d_mut = defaults[n - 1]
         co_r = st.slider(
@@ -164,8 +165,10 @@ for n, tab in enumerate(tabs, start=1):
         if res:
             show_result(res)
 
-# --- Default baseline (values fixed in the code, no slider) ---------
-with st.expander(f"Default baseline (CO_R = {DEFAULT_CO_R}, MUT_R = {DEFAULT_MUT_R})"):
+# --- Default tab (values fixed in the code, no slider) ---------------
+with tab_default:
+    st.write(f"CO_R = {DEFAULT_CO_R}, MUT_R = {DEFAULT_MUT_R} "
+             "(default values from the assignment, fixed in the code)")
     if st.button("Run Default", key="run_default"):
         st.session_state["results"]["Default"] = do_run(
             "Default", DEFAULT_CO_R, DEFAULT_MUT_R, int(seed_input)
@@ -177,7 +180,7 @@ with st.expander(f"Default baseline (CO_R = {DEFAULT_CO_R}, MUT_R = {DEFAULT_MUT
 if st.session_state["results"]:
     st.subheader("Trial Comparison Summary")
     rows = []
-    for key in [1, 2, 3, "Default"]:
+    for key in ["Default", 1, 2, 3]:
         r = st.session_state["results"].get(key)
         if r:
             rows.append({
