@@ -144,7 +144,7 @@ def show_result(res):
 
 tab_default, tab1, tab2, tab3 = st.tabs(["Default", "Trial 1", "Trial 2", "Trial 3"])
 trial_tabs = [tab1, tab2, tab3]
-defaults = [(0.8, 0.05), (0.5, 0.03), (0.95, 0.01)]   # starting values for each trial
+defaults = [(0.95, 0.05), (0.5, 0.03), (0.95, 0.01)]   # starting values for each trial
 
 for n, tab in enumerate(trial_tabs, start=1):
     with tab:
